@@ -1,1 +1,1 @@
-from RetinaFacePostProcessing.postprocessor import Postprocessor
+from RetinaFacePostProcessing.retinaface_post_processing import RetinaFacePostPostprocessor

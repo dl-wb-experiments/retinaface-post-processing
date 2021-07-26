@@ -1,6 +1,6 @@
 import re
 from itertools import product
-from typing import List
+from typing import List, Tuple
 
 import numpy as np
 
@@ -33,20 +33,23 @@ def nms(x1: np.ndarray, y1: np.ndarray, x2: np.ndarray, y2: np.ndarray,
     return keep
 
 
-class Postprocessor:
-    def __init__(self):
+class RetinaFacePostPostprocessor:
+    def __init__(self, origin_image_size: Tuple[int, int], input_image_size: Tuple[int, int]):
+        self._origin_image_size = origin_image_size
+        self._input_image_size = input_image_size
         self.nms_threshold = 0.3
+        self.face_prob_threshold = 0.5
         self.variance = [0.1, 0.2]
 
-    def process_output(self, raw_output, scale_x, scale_y, face_prob_threshold, image_size):
+    def process_output(self, raw_output: np.ndarray):
         bboxes_output = [raw_output[name][0] for name in raw_output if re.search('.bbox.', name)][0]
 
         scores_output = [raw_output[name][0] for name in raw_output if re.search('.cls.', name)][0]
 
-        prior_data = self.generate_prior_data(image_size)
-        proposals = self._get_proposals(bboxes_output, prior_data, image_size)
+        prior_data = self.generate_prior_data()
+        proposals = self._get_proposals(bboxes_output, prior_data)
         scores = scores_output[:, 1]
-        filter_idx = np.where(scores > face_prob_threshold)[0]
+        filter_idx = np.where(scores > self.face_prob_threshold)[0]
         proposals = proposals[filter_idx]
         scores = scores[filter_idx]
 
@@ -61,40 +64,40 @@ class Postprocessor:
         if np.size(scores) != 0:
             scores = np.reshape(scores, -1)
             x_mins, y_mins, x_maxs, y_maxs = np.array(proposals).T
-            x_mins /= scale_x
-            x_maxs /= scale_x
-            y_mins /= scale_y
-            y_maxs /= scale_y
 
             for x_min, y_min, x_max, y_max, score in zip(x_mins, y_mins, x_maxs, y_maxs, scores):
+                x_min *= self.scale_x
+                y_min *= self.scale_y
+                x_max *= self.scale_x
+                y_max *= self.scale_y
                 result.append((x_min, y_min, x_max, y_max, score))
 
         return result
 
-    @staticmethod
-    def generate_prior_data(image_size):
+    def generate_prior_data(self):
         global_min_sizes = [[16, 32], [64, 128], [256, 512]]
         steps = [8, 16, 32]
         anchors = []
-        feature_maps = [[int(np.rint(image_size[0] / step)), int(np.rint(image_size[1] / step))] for step in steps]
+        feature_maps = [[int(np.rint(self._input_image_size[0] / step)), int(np.rint(self._input_image_size[1] / step))]
+                        for step in steps]
         for idx, feature_map in enumerate(feature_maps):
             min_sizes = global_min_sizes[idx]
             for i, j in product(range(feature_map[0]), range(feature_map[1])):
                 for min_size in min_sizes:
-                    s_kx = min_size / image_size[1]
-                    s_ky = min_size / image_size[0]
-                    dense_cx = [x * steps[idx] / image_size[1] for x in [j + 0.5]]
-                    dense_cy = [y * steps[idx] / image_size[0] for y in [i + 0.5]]
+                    s_kx = min_size / self._input_image_size[1]
+                    s_ky = min_size / self._input_image_size[0]
+                    dense_cx = [x * steps[idx] / self._input_image_size[1] for x in [j + 0.5]]
+                    dense_cy = [y * steps[idx] / self._input_image_size[0] for y in [i + 0.5]]
                     for cy, cx in product(dense_cy, dense_cx):
                         anchors += [cx, cy, s_kx, s_ky]
 
         priors = np.array(anchors).reshape((-1, 4))
         return priors
 
-    def _get_proposals(self, raw_boxes, priors, image_size):
+    def _get_proposals(self, raw_boxes, priors):
         proposals = self.decode_boxes(raw_boxes, priors, self.variance)
-        proposals[:, ::2] = proposals[:, ::2] * image_size[1]
-        proposals[:, 1::2] = proposals[:, 1::2] * image_size[0]
+        proposals[:, ::2] = proposals[:, ::2] * self._input_image_size[1]
+        proposals[:, 1::2] = proposals[:, 1::2] * self._input_image_size[0]
         return proposals
 
     @staticmethod
@@ -105,3 +108,11 @@ class Postprocessor:
         boxes[:, :2] -= boxes[:, 2:] / 2
         boxes[:, 2:] += boxes[:, :2]
         return boxes
+
+    @property
+    def scale_x(self) -> float:
+        return self._origin_image_size[0] / self._input_image_size[0]
+
+    @property
+    def scale_y(self) -> float:
+        return self._origin_image_size[1] / self._input_image_size[1]
