@@ -78,16 +78,16 @@ class RetinaFacePostPostprocessor:
         global_min_sizes = [[16, 32], [64, 128], [256, 512]]
         steps = [8, 16, 32]
         anchors = []
-        feature_maps = [[int(np.rint(self._input_image_size[0] / step)), int(np.rint(self._input_image_size[1] / step))]
+        feature_maps = [[int(np.rint(self._input_image_size[1] / step)), int(np.rint(self._input_image_size[0] / step))]
                         for step in steps]
         for idx, feature_map in enumerate(feature_maps):
             min_sizes = global_min_sizes[idx]
             for i, j in product(range(feature_map[0]), range(feature_map[1])):
                 for min_size in min_sizes:
-                    s_kx = min_size / self._input_image_size[1]
-                    s_ky = min_size / self._input_image_size[0]
-                    dense_cx = [x * steps[idx] / self._input_image_size[1] for x in [j + 0.5]]
-                    dense_cy = [y * steps[idx] / self._input_image_size[0] for y in [i + 0.5]]
+                    s_kx = min_size / self._input_image_size[0]
+                    s_ky = min_size / self._input_image_size[1]
+                    dense_cx = [x * steps[idx] / self._input_image_size[0] for x in [j + 0.5]]
+                    dense_cy = [y * steps[idx] / self._input_image_size[1] for y in [i + 0.5]]
                     for cy, cx in product(dense_cy, dense_cx):
                         anchors += [cx, cy, s_kx, s_ky]
 
@@ -96,8 +96,8 @@ class RetinaFacePostPostprocessor:
 
     def _get_proposals(self, raw_boxes, priors):
         proposals = self.decode_boxes(raw_boxes, priors, self.variance)
-        proposals[:, ::2] = proposals[:, ::2] * self._input_image_size[1]
-        proposals[:, 1::2] = proposals[:, 1::2] * self._input_image_size[0]
+        proposals[:, ::2] = proposals[:, ::2] * self._input_image_size[0]
+        proposals[:, 1::2] = proposals[:, 1::2] * self._input_image_size[1]
         return proposals
 
     @staticmethod
@@ -111,8 +111,8 @@ class RetinaFacePostPostprocessor:
 
     @property
     def scale_x(self) -> float:
-        return self._origin_image_size[0] / self._input_image_size[0]
+        return self._origin_image_size[0] / self._input_image_size[1]
 
     @property
     def scale_y(self) -> float:
-        return self._origin_image_size[1] / self._input_image_size[1]
+        return self._origin_image_size[1] / self._input_image_size[0]

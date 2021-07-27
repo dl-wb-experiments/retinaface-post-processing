@@ -31,7 +31,7 @@ setup(
     license='OSI Approved :: Apache Software License',
     description='RetinaFace Post-Processing is a module contains code for post-processing of RetinaFace inference results',
     url='https://github.com/dl-wb-experiments/retinaface-post-processing',
-    version='0.0.3',
+    version='0.0.4',
     install_requires=REQUIRED_PACKAGES,
     long_description=LONG_DESCRIPTION,
     long_description_content_type='text/markdown',
